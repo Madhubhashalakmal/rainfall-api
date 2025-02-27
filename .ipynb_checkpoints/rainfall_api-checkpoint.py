@@ -1,9 +1,10 @@
 from flask import Flask, jsonify, request
 import pandas as pd
 from flask_cors import CORS
+import os
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for API access from frontend
+CORS(app)  # Enable CORS for frontend access
 
 # Load all predictions into memory for quick access
 years = [2024, 2025, 2026, 2027]
@@ -11,12 +12,19 @@ predictions_by_year = {}
 
 for year in years:
     file_name = f"predictions_{year}.csv"
-    try:
-        df = pd.read_csv(file_name)
-        predictions_by_year[year] = df
-        print(f"✅ Loaded {file_name}")
-    except FileNotFoundError:
+    if os.path.exists(file_name):
+        try:
+            df = pd.read_csv(file_name)
+            predictions_by_year[year] = df
+            print(f"✅ Loaded {file_name}")
+        except Exception as e:
+            print(f"⚠️ Error loading {file_name}: {e}")
+    else:
         print(f"⚠️ Warning: {file_name} not found. Skipping {year}")
+
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"message": "Rainfall Prediction API is running!"})
 
 @app.route("/predict", methods=["GET"])
 def get_predictions():
@@ -48,7 +56,7 @@ def get_predictions():
         # Filter by month if provided
         if month:
             filtered_df = filtered_df[filtered_df["Month"].str.lower() == month.lower()]
-        
+
         # Check if results exist
         if filtered_df.empty:
             return jsonify({"error": "No data found for given parameters"}), 404
@@ -61,5 +69,5 @@ def get_predictions():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
+    port = int(os.environ.get("PORT", 5000))  # Allow dynamic port binding for Render
+    app.run(host="0.0.0.0", port=port)
